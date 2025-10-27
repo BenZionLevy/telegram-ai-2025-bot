@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # --- אתחול Gemini API ---
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-pro') # שימוש במודל היציב gemini-pro
 
 # --- שרת אינטרנט פשוט כדי שהבוט יישאר חי ---
 app = Flask(__name__)
@@ -45,10 +45,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'chat_session' not in context.user_data:
         context.user_data['chat_session'] = model.start_chat(history=[])
     
-    # תיקון קריטי: מוציאים את המשתנה מחוץ ל-if כדי שיעבוד גם בהודעות הבאות
     chat = context.user_data['chat_session']
     
     try:
+        # הפעלת הפונקציה החוסמת של ג'ימיני בתהליך נפרד כדי לא לחסום את הבוט
         response = await asyncio.to_thread(chat.send_message, update.message.text)
         await update.message.reply_text(response.text)
     except Exception as e:
@@ -59,21 +59,19 @@ def main():
     """הפונקציה הראשית שמפעילה את הכל."""
     
     # 1. הרצת שרת האינטרנט בתהליך נפרד (thread)
-    # daemon=True גורם לתהליך להיסגר כשהתוכנית הראשית נסגרת
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     
     # 2. בנייה והרצה של הבוט
-    logger.info("Starting bot...")
+    logger.info("Starting bot with modern library...")
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     
     # הוספת המטפלים (handlers)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # הרצת הבוט עד שהתהליך יופסק
+    # הרצת הבוט
     application.run_polling()
 
 if __name__ == '__main__':
     main()
-
