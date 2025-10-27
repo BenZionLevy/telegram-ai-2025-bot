@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # --- אתחול Gemini API ---
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-pro') # שימוש במודל היציב gemini-pro
+model = genai.GenerativeModel('gemini-pro')
 
 # --- שרת אינטרנט פשוט כדי שהבוט יישאר חי ---
 app = Flask(__name__)
@@ -37,40 +37,34 @@ def run_flask():
 
 # --- פונקציות הבוט (מעודכנות עם async/await) ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """שולח הודעת פתיחה."""
     await update.message.reply_text('שלום! אני בוט המחובר ל-Gemini. שלחו לי הודעה ואענה.')
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """מטפל בהודעות טקסט מהמשתמש."""
+    # !!! הוספנו את שורת הבדיקה הזו !!!
+    logger.info(f"Received a message! Attempting to process for user {update.effective_chat.id}")
+    
     if 'chat_session' not in context.user_data:
         context.user_data['chat_session'] = model.start_chat(history=[])
     
     chat = context.user_data['chat_session']
     
     try:
-        # הפעלת הפונקציה החוסמת של ג'ימיני בתהליך נפרד כדי לא לחסום את הבוט
         response = await asyncio.to_thread(chat.send_message, update.message.text)
         await update.message.reply_text(response.text)
     except Exception as e:
-        logger.error(f"Error from Gemini: {e}")
-        await update.message.reply_text("מצטער, הייתה שגיאה בעיבוד הבקשה.")
+        logger.error(f"CRITICAL ERROR from Gemini or during processing: {e}")
+        await update.message.reply_text("מצטער, הייתה שגיאה קריטית בעיבוד הבקשה.")
 
 def main():
-    """הפונקציה הראשית שמפעילה את הכל."""
-    
-    # 1. הרצת שרת האינטרנט בתהליך נפרד (thread)
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     
-    # 2. בנייה והרצה של הבוט
     logger.info("Starting bot with modern library...")
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     
-    # הוספת המטפלים (handlers)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # הרצת הבוט
     application.run_polling()
 
 if __name__ == '__main__':
