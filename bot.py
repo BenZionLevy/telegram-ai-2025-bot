@@ -4,9 +4,11 @@ import google.generativeai as genai
 import threading
 from flask import Flask
 from dotenv import load_dotenv
+import asyncio
 
-# *** חשוב: זו הגרסה הישנה של הייבוא שתואמת לספרייה 13.15 ***
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+# ייבואים מעודכנים לגרסה 20.x
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- טעינת המשתנים הסודיים ---
 load_dotenv()
@@ -23,46 +25,54 @@ logger = logging.getLogger(__name__)
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- שרת אינטרנט פשוט ---
+# --- שרת אינטרנט פשוט כדי שהבוט יישאר חי ---
 app = Flask(__name__)
 @app.route('/')
 def home():
     return "Bot is alive!", 200
 
 def run_flask():
-  port = int(os.environ.get('PORT', 8080))
-  app.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
 
-# ---------------------------------
+# --- פונקציות הבוט (מעודכנות עם async/await) ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """שולח הודעת פתיחה."""
+    await update.message.reply_text('שלום! אני בוט המחובר ל-Gemini. שלחו לי הודעה ואענה.')
 
-def start(update, context):
-    update.message.reply_text('שלום! אני בוט המחובר ל-Gemini. שלחו לי הודעה ואענה.')
-
-def handle_message(update, context):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """מטפל בהודעות טקסט מהמשתמש."""
     if 'chat_session' not in context.user_data:
         context.user_data['chat_session'] = model.start_chat(history=[])
     
+    # תיקון קריטי: מוציאים את המשתנה מחוץ ל-if כדי שיעבוד גם בהודעות הבאות
     chat = context.user_data['chat_session']
+    
     try:
-        response = chat.send_message(update.message.text)
-        update.message.reply_text(response.text)
+        response = await asyncio.to_thread(chat.send_message, update.message.text)
+        await update.message.reply_text(response.text)
     except Exception as e:
         logger.error(f"Error from Gemini: {e}")
-        update.message.reply_text("מצטער, הייתה שגיאה בעיבוד הבקשה.")
+        await update.message.reply_text("מצטער, הייתה שגיאה בעיבוד הבקשה.")
 
-def main_bot():
-    updater = Updater(TELEGRAM_TOKEN, use_context=True)
-    dispatcher = updater.dispatcher
-    dispatcher.add_handler(CommandHandler("start", start))
+def main():
+    """הפונקציה הראשית שמפעילה את הכל."""
     
-    # *** חשוב: זו הגרסה הישנה של הפילטרים שתואמת לספרייה 13.15 ***
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
-    
-    logger.info("Bot is polling...")
-    updater.start_polling()
-
-if __name__ == '__main__':
-    flask_thread = threading.Thread(target=run_flask)
+    # 1. הרצת שרת האינטרנט בתהליך נפרד (thread)
+    # daemon=True גורם לתהליך להיסגר כשהתוכנית הראשית נסגרת
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     
-    main_bot()
+    # 2. בנייה והרצה של הבוט
+    logger.info("Starting bot...")
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    
+    # הוספת המטפלים (handlers)
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    # הרצת הבוט עד שהתהליך יופסק
+    application.run_polling()
+
+if __name__ == '__main__':
+    main()
