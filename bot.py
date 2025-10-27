@@ -1,9 +1,13 @@
 import logging
 import os
 import google.generativeai as genai
-import threading # ייבאנו את ספריית התהליכים
-from flask import Flask # ייבאנו את ספריית שרת האינטרנט
+import threading
+from flask import Flask
 from dotenv import load_dotenv
+
+# --- הוספנו את השורות החסרות כאן ---
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+# ------------------------------------
 
 # --- טעינת המשתנים הסודיים ---
 load_dotenv()
@@ -27,7 +31,9 @@ def home():
     return "Bot is alive!", 200
 
 def run_flask():
-  app.run(host='0.0.0.0', port=8080)
+  # Render דורש שהפורט יגיע ממשתנה סביבה
+  port = int(os.environ.get('PORT', 8080))
+  app.run(host='0.0.0.0', port=port)
 # ---------------------------------
 
 def start(update, context):
@@ -54,7 +60,7 @@ def main_bot():
     
     logger.info("Bot is polling...")
     updater.start_polling()
-    updater.idle()
+    # updater.idle() # אנחנו לא צריכים את זה יותר כי השרת רץ בלולאה משלו
 
 if __name__ == '__main__':
     # הרצת השרת בתהליך נפרד (thread)
