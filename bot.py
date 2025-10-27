@@ -5,25 +5,25 @@ import threading
 from flask import Flask
 from dotenv import load_dotenv
 
-# 1. שינינו את הייבוא (import) כאן
+# FIX #1: The import statement is changed here
 from telegram.ext import Updater, CommandHandler, MessageHandler, filters
 
-# --- טעינת המשתנים הסודיים ---
+# --- Load Environment Variables ---
 load_dotenv()
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
-# --- הגדרות לוגינג ---
+# --- Logging Setup ---
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# --- אתחול Gemini API ---
+# --- Initialize Gemini API ---
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- הוספת שרת אינטרנט פשוט ---
+# --- Simple Web Server to keep the bot alive ---
 app = Flask(__name__)
 @app.route('/')
 def home():
@@ -51,12 +51,12 @@ def handle_message(update, context):
         update.message.reply_text("מצטער, הייתה שגיאה בעיבוד הבקשה.")
 
 def main_bot():
-    """הפונקציה שמפעילה את הבוט"""
+    """The function that runs the bot"""
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))
     
-    # 2. שינינו את אופן השימוש בפילטר כאן
+    # FIX #2: The filter usage is changed here
     dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     logger.info("Bot is polling...")
