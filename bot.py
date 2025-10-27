@@ -5,9 +5,8 @@ import threading
 from flask import Flask
 from dotenv import load_dotenv
 
-# --- הוספנו את השורות החסרות כאן ---
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-# ------------------------------------
+# 1. שינינו את הייבוא (import) כאן
+from telegram.ext import Updater, CommandHandler, MessageHandler, filters
 
 # --- טעינת המשתנים הסודיים ---
 load_dotenv()
@@ -31,9 +30,9 @@ def home():
     return "Bot is alive!", 200
 
 def run_flask():
-  # Render דורש שהפורט יגיע ממשתנה סביבה
   port = int(os.environ.get('PORT', 8080))
   app.run(host='0.0.0.0', port=port)
+
 # ---------------------------------
 
 def start(update, context):
@@ -56,16 +55,15 @@ def main_bot():
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+    
+    # 2. שינינו את אופן השימוש בפילטר כאן
+    dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     logger.info("Bot is polling...")
     updater.start_polling()
-    # updater.idle() # אנחנו לא צריכים את זה יותר כי השרת רץ בלולאה משלו
 
 if __name__ == '__main__':
-    # הרצת השרת בתהליך נפרד (thread)
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.start()
     
-    # הרצת הבוט
     main_bot()
